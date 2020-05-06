@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="color_primary">#3175A8</color>
+    <color name="color_primary_dark">#225175</color>
+    <color name="color_accent">#001457</color>
+    <color name="black_overlay">#66272727</color>
+    <color name="button_text_enabled">#C8C8C8</color>
+    <color name="button_text_disabled">#808080</color>
+    <color name="help_text">#393939</color>
+    <color name="about_text">#393939</color>
+</resources>

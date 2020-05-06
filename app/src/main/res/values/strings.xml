@@ -1,0 +1,49 @@
+<resources>
+    <string name="app_name">LW Drone Cam</string>
+
+    <!-- app button -->
+    <string name="start_stream">Start Stream</string>
+    <string name="stop_stream">Stop Stream</string>
+    <string name="start_record">Start Recording</string>
+    <string name="stop_record">Stop Recording</string>
+
+    <!-- settings -->
+    <string name="about">About</string>
+    <string name="camera_host_info">Camera Host Information</string>
+    <string name="camera_ip">Camera IP</string>
+    <string name="camera_stream_port">Camera Streaming Port</string>
+    <string name="camera_ctrl_port">Camera Control Port</string>
+    <string name="settings">Settings</string>
+    <string name="support">Support</string>
+
+    <!-- settings error messages -->
+    <string name="invalid_ip">Invalid IP</string>
+    <string name="invalid_port">Invalid port</string>
+
+    <!-- help dialog -->
+    <string name="help_title">Help</string>
+    <string-array name="help_content">
+        <item>Connect to the drone\'s WiFi network. The network name might start with
+            \"udirc-FPV-\".</item>
+        <item>Edit the new WiFi network\'s settings to manually set an IP address. Change the IP
+            settings to \"Static\". Set the IP address to \"192.168.0.2\". Set the Gateway to
+            \"192.168.0.254\". Set the Network prefix length to "24".</item>
+        <item>The default IP address for the camera should be \"192.168.0.1\".</item>
+    </string-array>
+
+    <!-- about dialog -->
+    <string name="about_title">About LW Drone Cam</string>
+    <string name="about_summary">This app provides the streaming view for a drone running lewei
+        software, using only Android resources and minimal app permissions.</string>
+    <string name="about_site_title">Website:</string>
+    <string name="about_site_url">https://github.com/meekworth/lwdronecam</string>
+
+    <!-- error messages -->
+    <string name="error_start_record_failed">Remote record failed</string>
+    <string name="error_stop_record_failed">Stop remote record failed</string>
+    <string name="stream_ended">Stream ended</string>
+    <string name="error_create_codec_failed">Failed to create video decoder</string>
+    <string name="error_resolve_host">Failed to resolve host %1$s</string>
+    <string name="error_timeout_connect">Timeout connecting to [%1$s]:%2$d</string>
+    <string name="error_stream">Stream Error</string>
+</resources>

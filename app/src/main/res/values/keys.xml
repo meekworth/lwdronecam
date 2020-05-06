@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MissingTranslation">
+
+    <string name="settings_key_about">about</string>
+    <string name="settings_key_cam_ip">camera_ip</string>
+    <string name="settings_key_cam_stream_port">camera_stream_port</string>
+    <string name="settings_key_cam_ctrl_port">camera_ctrl_port</string>
+    <string name="settings_key_help">help</string>
+</resources>

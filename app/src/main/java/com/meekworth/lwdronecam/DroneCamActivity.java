@@ -243,11 +243,11 @@ public class DroneCamActivity extends AppCompatActivity {
         if (currText.equals(getString(R.string.start_stream))) {
             disableButton(b);
             try {
-                String ipKey = getString(R.string.settings_key_cam_ip);
-                String portKey = getString(R.string.settings_key_cam_stream_port);
-                mDroneCam.startStreaming(
-                        prefs.getString(ipKey, null),
-                        Integer.parseInt(prefs.getString(portKey, "0")));
+                String host = getSettingString(
+                        R.string.settings_key_cam_ip, R.string.default_cam_ip);
+                int port = getSettingInt(
+                        R.string.settings_key_cam_stream_port, R.string.default_cam_stream_port);
+                mDroneCam.startStreaming(host, port);
             }
             catch (DroneCamException e) {
                 Utils.showMessage(e.getMessage());
@@ -263,11 +263,10 @@ public class DroneCamActivity extends AppCompatActivity {
     }
 
     private void handleRecordClick(@NonNull Button b) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String currText = b.getText().toString();
-        String host = prefs.getString(getString(R.string.settings_key_cam_ip), null);
-        int port = Integer.parseInt(
-                prefs.getString(getString(R.string.settings_key_cam_ctrl_port), "0"));
+        String host = getSettingString(R.string.settings_key_cam_ip, R.string.default_cam_ip);
+        int port = getSettingInt(
+                R.string.settings_key_cam_ctrl_port, R.string.default_cam_ctrl_port);
 
         if (currText.equals(getString(R.string.start_record))) {
             // Set current time here for checkResumeStreaming() to use in case streaming
@@ -283,6 +282,24 @@ public class DroneCamActivity extends AppCompatActivity {
         else if (currText.equals(getString(R.string.stop_record))) {
             mDroneCam.stopRemoteRecord(host, port);
             enableButton(b);
+        }
+    }
+
+    private String getSettingString(int keyId, int defaultId) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        return prefs.getString(getString(keyId), getString(defaultId));
+    }
+
+    private int getSettingInt(int keyId, int defaultId) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String val = getSettingString(keyId, defaultId);
+
+        try {
+            return Integer.parseInt(val);
+        }
+        catch (NumberFormatException e) {
+            Utils.loge(TAG, "failed to parse int setting value: %s", val);
+            return 0;
         }
     }
 

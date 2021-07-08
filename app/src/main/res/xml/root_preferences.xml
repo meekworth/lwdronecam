@@ -10,9 +10,9 @@
             app:key="@string/settings_key_cam_stream_port"
             app:title="@string/camera_stream_port" />
         <EditTextPreference
-            app:defaultValue="@string/default_cam_ctrl_port"
-            app:key="@string/settings_key_cam_ctrl_port"
-            app:title="@string/camera_ctrl_port" />
+            app:defaultValue="@string/default_cam_cmd_port"
+            app:key="@string/settings_key_cam_cmd_port"
+            app:title="@string/camera_cmd_port" />
 
     </PreferenceCategory>
 

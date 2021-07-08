@@ -1,14 +1,25 @@
 package com.meekworth.lwdronecam;
 
+import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
+import android.media.MediaFormat;
+import android.view.Surface;
 
+import com.meekworth.lwdronecam.lwcomms.StreamingTarget;
+
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
-class StreamingCodecTarget implements StreamingTarget {
-    private MediaCodec mCodec;
+public class StreamingCodecTarget implements StreamingTarget {
+    private final MediaCodec mCodec;
 
-    StreamingCodecTarget(MediaCodec codec) {
-        mCodec = codec;
+    StreamingCodecTarget(SurfaceTexture surface, int width, int height) throws IOException {
+        mCodec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
+        MediaFormat format = MediaFormat.createVideoFormat(
+                MediaFormat.MIMETYPE_VIDEO_AVC, width, height);
+        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, width * height);
+        mCodec.configure(format, new Surface(surface), null, 0);
+        mCodec.start();
     }
 
     @Override
@@ -38,11 +49,7 @@ class StreamingCodecTarget implements StreamingTarget {
     public void finished() {
         sendFrame(new byte[0]);
         mCodec.flush();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        return (o instanceof StreamingCodecTarget)
-                && mCodec.equals(((StreamingCodecTarget)o).mCodec);
+        mCodec.stop();
+        mCodec.release();
     }
 }

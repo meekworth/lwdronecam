@@ -4,10 +4,12 @@ import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.view.TextureView;
 
+import com.meekworth.lwdronecam.utils.Log;
+
 class CameraViewListener implements TextureView.SurfaceTextureListener {
     private static final String TAG = "LWDroneCam/CameraViewListener";
-    private DroneCam mDroneCam;
-    private TextureView mTexture;
+    private final DroneCam mDroneCam;
+    private final TextureView mTexture;
 
     CameraViewListener(DroneCam droneCam, TextureView texture) {
         mDroneCam = droneCam;
@@ -16,26 +18,26 @@ class CameraViewListener implements TextureView.SurfaceTextureListener {
 
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        Utils.logv(TAG, "surface available (%d, %d)", width, height);
+        Log.v(TAG, "surface available (%d, %d)", width, height);
         mDroneCam.setSurface(surface);
         adjustSize(DroneCam.DEFAULT_VID_WIDTH, DroneCam.DEFAULT_VID_HEIGHT, width, height);
     }
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-        Utils.logv(TAG, "surface size changed (%d, %d)", width, height);
+        Log.v(TAG, "surface size changed (%d, %d)", width, height);
         adjustSize(DroneCam.DEFAULT_VID_WIDTH, DroneCam.DEFAULT_VID_HEIGHT, width, height);
     }
 
     @Override
     public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        Utils.logv(TAG, "surface destroyed");
+        Log.v(TAG, "surface destroyed");
         return false;
     }
 
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        Utils.logv(TAG, "surface updated");
+        Log.v(TAG, "surface updated");
     }
 
     private void adjustSize(int videoWidth, int videoHeight, int viewWidth, int viewHeight) {

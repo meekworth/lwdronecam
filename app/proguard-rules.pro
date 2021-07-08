@@ -20,9 +20,9 @@
 # hide the original source file name.
 -renamesourcefileattribute SourceFile
 
--assumenosideeffects class com.meekworth.lwdronecam.Utils {
-    static void loge(...);
-    static void logi(...);
-    static void logd(...);
-    static void logv(...);
+-assumenosideeffects class com.meekworth.lwdronecam.utils.Log {
+    public static void e(...);
+    public static void i(...);
+    public static void d(...);
+    public static void v(...);
 }

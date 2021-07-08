@@ -6,10 +6,8 @@ import android.text.InputType;
 import android.util.Patterns;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.ListView;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -50,93 +48,69 @@ public class SettingsActivity extends AppCompatActivity {
 
             if ((pref = findPreference(getString(R.string.settings_key_cam_stream_port))) != null) {
                 ((EditTextPreference)pref).setOnBindEditTextListener(
-                        new EditTextPreference.OnBindEditTextListener() {
-                            @Override
-                            public void onBindEditText(@NonNull EditText editText) {
-                                editText.setInputType(InputType.TYPE_CLASS_NUMBER);
-                            }
-                        }
+                        editText -> editText.setInputType(InputType.TYPE_CLASS_NUMBER)
                 );
                 setOnChangeListener(pref, new PortPreferenceValidator(), R.string.invalid_port);
                 setEditTextSummaryProvider((EditTextPreference)pref);
             }
 
-            if ((pref = findPreference(getString(R.string.settings_key_cam_ctrl_port))) != null) {
+            if ((pref = findPreference(getString(R.string.settings_key_cam_cmd_port))) != null) {
                 ((EditTextPreference)pref).setOnBindEditTextListener(
-                        new EditTextPreference.OnBindEditTextListener() {
-                            @Override
-                            public void onBindEditText(@NonNull EditText editText) {
-                                editText.setInputType(InputType.TYPE_CLASS_NUMBER);
-                            }
-                        }
+                        editText -> editText.setInputType(InputType.TYPE_CLASS_NUMBER)
                 );
                 setOnChangeListener(pref, new PortPreferenceValidator(), R.string.invalid_port);
                 setEditTextSummaryProvider((EditTextPreference)pref);
             }
 
             if ((pref = findPreference(getString(R.string.settings_key_about))) != null) {
-                pref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                    @Override
-                    public boolean onPreferenceClick(Preference preference) {
-                        Context context = getContext();
-                        if (context != null) {
-                            AlertDialog dialog = new AlertDialog.Builder(context)
-                                    .setTitle(R.string.about_title)
-                                    .setView(R.layout.dialog_about)
-                                    .create();
-                            dialog.show();
-                        }
-                        return true;
+                pref.setOnPreferenceClickListener(preference -> {
+                    Context context = getContext();
+                    if (context != null) {
+                        AlertDialog dialog = new AlertDialog.Builder(context)
+                                .setTitle(R.string.about_title)
+                                .setView(R.layout.dialog_about)
+                                .create();
+                        dialog.show();
                     }
+                    return true;
                 });
             }
 
             if ((pref = findPreference(getString(R.string.settings_key_help))) != null) {
-                pref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-                    @Override
-                    public boolean onPreferenceClick(Preference preference) {
-                        Context context = getContext();
-                        if (context != null) {
-                            View helpView = getLayoutInflater().inflate(
-                                    R.layout.dialog_help, null);
-                            ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
-                                    context,
-                                    R.array.help_content,
-                                    R.layout.listview_help_item);
-                            ListView listView = helpView.findViewById(R.id.help_content_list);
-                            listView.setAdapter(adapter);
-                            AlertDialog dialog = new AlertDialog.Builder(context)
-                                    .setTitle(R.string.help_title)
-                                    .setView(helpView)
-                                    .create();
-                            dialog.show();
-                        }
-                        return true;
+                pref.setOnPreferenceClickListener(preference -> {
+                    Context context = getContext();
+                    if (context != null) {
+                        View helpView = getLayoutInflater().inflate(
+                                R.layout.dialog_help, null);
+                        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                                context,
+                                R.array.help_content,
+                                R.layout.listview_help_item);
+                        ListView listView = helpView.findViewById(R.id.help_content_list);
+                        listView.setAdapter(adapter);
+                        AlertDialog dialog = new AlertDialog.Builder(context)
+                                .setTitle(R.string.help_title)
+                                .setView(helpView)
+                                .create();
+                        dialog.show();
                     }
+                    return true;
                 });
             }
         }
 
         private void setEditTextSummaryProvider(EditTextPreference pref) {
-            pref.setSummaryProvider(new Preference.SummaryProvider() {
-                @Override
-                public CharSequence provideSummary(Preference preference) {
-                    return ((EditTextPreference)preference).getText();
-                }
-            });
+            pref.setSummaryProvider(preference -> ((EditTextPreference)preference).getText());
         }
 
         private void setOnChangeListener(Preference pref, final PreferenceValidator validator,
                                          final int errMsgResId) {
-            pref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-                @Override
-                public boolean onPreferenceChange(Preference preference, Object newValue) {
-                    if (!validator.validate(newValue)) {
-                        Utils.showMessage(getString(errMsgResId));
-                        return false;
-                    }
-                    return true;
+            pref.setOnPreferenceChangeListener((preference, newValue) -> {
+                if (!validator.validate(newValue)) {
+                    StatusHandler.showMessage(getString(errMsgResId));
+                    return false;
                 }
+                return true;
             });
         }
     }

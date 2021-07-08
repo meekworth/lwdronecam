@@ -5,6 +5,6 @@
     <string name="settings_key_about">about</string>
     <string name="settings_key_cam_ip">camera_ip</string>
     <string name="settings_key_cam_stream_port">camera_stream_port</string>
-    <string name="settings_key_cam_ctrl_port">camera_ctrl_port</string>
+    <string name="settings_key_cam_cmd_port">camera_cmd_port</string>
     <string name="settings_key_help">help</string>
 </resources>

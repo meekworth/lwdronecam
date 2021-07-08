@@ -1,191 +1,208 @@
 package com.meekworth.lwdronecam;
 
 import android.graphics.SurfaceTexture;
-import android.media.MediaCodec;
-import android.media.MediaFormat;
-import android.view.Surface;
+
+import com.meekworth.lwdronecam.lwcomms.CamConnection;
+import com.meekworth.lwdronecam.lwcomms.LwcommsException;
+import com.meekworth.lwdronecam.utils.Log;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-class DroneCam {
+/*
+ * This class is used on the main thread, so the actual connections are separated out
+ * into the CamConnection class, which is used in threads started by this class.
+ */
+public class DroneCam {
     private static final String TAG = "LWDroneCam/DroneCam";
+    private static final int MAX_STREAMS = 1;
 
     // Default from what the drone's camera sends back
+    // TODO: maybe put these in settings
     static final int DEFAULT_VID_WIDTH = 1280;
     static final int DEFAULT_VID_HEIGHT = 720;
 
-    private StatusHandler mHandler;
+    private final StatusHandler mHandler;
+    private final AtomicBoolean mStreamOn;
+    private final Semaphore mStreamSem;
     private SurfaceTexture mSurface;
-    private StreamingConnector mStreamer;
-    private AtomicBoolean mStreaming;
+    private String mHost;
+    private int mStreamPort;
+    private int mCmdPort;
 
-    DroneCam(StatusHandler handler) {
+    DroneCam(StatusHandler handler, String host, int streamPort, int cmdPort) {
         mHandler = handler;
-        mStreaming = new AtomicBoolean(false);
+        mStreamOn = new AtomicBoolean(false);
+        mStreamSem = new Semaphore(MAX_STREAMS, true);
+        mHost = host;
+        mStreamPort = streamPort;
+        mCmdPort = cmdPort;
     }
 
     void setSurface(SurfaceTexture surface) {
         mSurface = surface;
     }
 
-    void startStreaming(final String host, final int port) throws DroneCamException {
+    void setConnectionSettings(String host, int streamPort, int cmdPort) {
+        mHost = host;
+        mStreamPort = streamPort;
+        mCmdPort = cmdPort;
+    }
+
+    void startStreaming() throws DroneCamException {
         if (mSurface == null) {
             throw new DroneCamException("Streaming view not ready");
         }
-        if (!mStreaming.compareAndSet(false, true)) {
+
+        if (!mStreamSem.tryAcquire()) {
             throw new DroneCamException("Streaming already enabled");
         }
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                MediaCodec codec;
+        new Thread(() -> {
+            StreamingCodecTarget streamTarget;
 
-                try {
-                    codec = createCodec();
-                }
-                catch (IOException e) {
-                    Utils.loge(TAG, "failed to create codec: %s", e.getMessage());
-                    mStreaming.set(false);
-                    mHandler.sendMessage(new StatusMessage(
-                            StatusMessage.Type.STREAM,
-                            StatusMessage.SubType.ERROR,
-                            R.string.error_create_codec_failed));
-                    return;
-                }
-
-                try (CameraConnection camConn = CameraConnection.createAndConnect(host, port)) {
-                    mStreamer = new StreamingConnector(camConn);
-                    mStreamer.addTarget(new StreamingCodecTarget(codec));
-                    mHandler.sendMessage(new StatusMessage(
-                            StatusMessage.Type.STREAM,
-                            StatusMessage.SubType.STARTED));
-                    mStreamer.streamingLoop();
-                    mHandler.sendMessage(new StatusMessage(
-                            StatusMessage.Type.NOTE,
-                            R.string.stream_ended));
-                }
-                catch (DroneCamException e) {
-                    Utils.loge(TAG, e.getMessage());
-                }
-                catch (UnknownHostException e) {
-                    Utils.loge(TAG, "resolving %s failed: %s", host, e.getMessage());
-                    mHandler.sendMessage(new StatusMessage(
-                            StatusMessage.Type.STREAM,
-                            StatusMessage.SubType.ERROR,
-                            R.string.error_resolve_host, host));
-                }
-                catch (SocketTimeoutException e) {
-                    Utils.loge(TAG, "timeout connecting to %s", host);
-                    mHandler.sendMessage(new StatusMessage(
-                            StatusMessage.Type.STREAM,
-                            StatusMessage.SubType.ERROR,
-                            R.string.error_timeout_connect, host, port));
-                }
-                catch (IOException e) {
-                    Utils.loge(TAG, "error streaming: %s", e.getMessage());
-                }
-
-                codec.stop();
-                codec.release();
-                mStreaming.set(false);
+            try {
+                streamTarget = new StreamingCodecTarget(
+                        mSurface, DEFAULT_VID_WIDTH, DEFAULT_VID_HEIGHT);
+            }
+            catch (IOException e) {
+                Log.e(TAG, "failed to create codec: %s", e.getMessage());
+                mStreamSem.release();
                 mHandler.sendMessage(new StatusMessage(
                         StatusMessage.Type.STREAM,
-                        StatusMessage.SubType.STOPPED));
+                        StatusMessage.SubType.ERROR,
+                        R.string.error_create_codec_failed));
+                return;
             }
+
+            try (CamConnection conn = CamConnection.createAndConnect(mHost, mStreamPort)) {
+                mStreamOn.set(true);
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.STREAM,
+                        StatusMessage.SubType.STARTED));
+                conn.streamVideo(mStreamOn, streamTarget);
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.NOTE,
+                        R.string.stream_ended));
+            }
+            catch (UnknownHostException e) {
+                Log.e(TAG, "resolving %s failed: %s", mHost, e.getMessage());
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.STREAM,
+                        StatusMessage.SubType.ERROR,
+                        R.string.error_resolve_host, mHost));
+            }
+            catch (SocketTimeoutException e) {
+                Log.e(TAG, "timeout connecting to %s", mHost);
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.STREAM,
+                        StatusMessage.SubType.ERROR,
+                        R.string.error_timeout_connect, mHost, streamTarget));
+            }
+            catch (IOException e) {
+                Log.e(TAG, e.getMessage());
+            }
+
+            mStreamOn.set(false);
+            mStreamSem.release();
+            mHandler.sendMessage(new StatusMessage(
+                    StatusMessage.Type.STREAM,
+                    StatusMessage.SubType.STOPPED));
         }).start();
     }
 
-    private MediaCodec createCodec() throws IOException {
-        MediaCodec codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC);
-        MediaFormat format = MediaFormat.createVideoFormat(
-                MediaFormat.MIMETYPE_VIDEO_AVC, DEFAULT_VID_WIDTH, DEFAULT_VID_HEIGHT);
-        format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, DEFAULT_VID_WIDTH * DEFAULT_VID_HEIGHT);
-        codec.configure(format, new Surface(mSurface), null, 0);
-        codec.start();
-
-        return codec;
-    }
-
     boolean isStreaming() {
-        return mStreaming.get();
+        return mStreamOn.get();
     }
 
     void stopStreaming() {
-        if (mStreamer != null) {
-            Utils.logd(TAG, "stopping streaming");
-            mStreamer.stop();
-        }
+        Log.d(TAG, "stopping streaming");
+        mStreamOn.set(false);
     }
 
-    void startRemoteRecord(final String host, final int port) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                boolean succ = false;
-
-                try {
-                    try (CameraConnection camConn =
-                                 CameraConnection.createAndConnect(host, port)) {
-                        camConn.setCurrentTime();
-                    }
-                    try (CameraConnection camConn =
-                                 CameraConnection.createAndConnect(host, port)) {
-                        succ = camConn.startRemoteRecord();
-                    }
-                }
-                catch (DroneCamException e) {
-                    Utils.loge(TAG, e.getMessage());
-                }
-                catch (IOException e) {
-                    Utils.loge(TAG, "error with ctrl connection: %s", e.getMessage());
-                }
-
-                if (succ) {
+    void checkRemoteRecording() {
+        new Thread(() -> {
+            try (CamConnection conn = CamConnection.createAndConnect(mHost, mCmdPort)) {
+                if (conn.isRecording()) {
                     mHandler.sendMessage(new StatusMessage(
                             StatusMessage.Type.RECORD,
                             StatusMessage.SubType.STARTED));
                 }
                 else {
-                    mHandler.sendMessage(new StatusMessage(
-                            StatusMessage.Type.RECORD,
-                            StatusMessage.SubType.ERROR,
-                            R.string.error_start_record_failed));
-                }
-            }
-        }).start();
-    }
-
-    void stopRemoteRecord(final String host, final int port) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                boolean succ = false;
-
-                try (CameraConnection camConn = CameraConnection.createAndConnect(host, port)) {
-                    succ = camConn.stopRemoteRecord();
-                }
-                catch (DroneCamException e) {
-                    Utils.loge(TAG, e.getMessage());
-                }
-                catch (IOException e) {
-                    Utils.loge(TAG, "error with ctrl connection: %s", e.getMessage());
-                }
-
-                if (succ) {
                     mHandler.sendMessage(new StatusMessage(
                             StatusMessage.Type.RECORD,
                             StatusMessage.SubType.STOPPED));
                 }
-                else {
-                    mHandler.sendMessage(new StatusMessage(
-                            StatusMessage.Type.RECORD,
-                            StatusMessage.SubType.ERROR,
-                            R.string.error_stop_record_failed));
+            }
+            catch (LwcommsException e) {
+                Log.e(TAG, e.getMessage());
+            }
+            catch (IOException e) {
+                Log.e(TAG, "error with cmd connection: %s", e.getMessage());
+            }
+        }).start();
+    }
+
+    void startRemoteRecord() {
+        new Thread(() -> {
+            boolean succ = false;
+
+            try {
+                try (CamConnection conn = CamConnection.createAndConnect(mHost, mCmdPort)) {
+                    conn.setCurrentTime();
                 }
+                try (CamConnection conn = CamConnection.createAndConnect(mHost, mCmdPort)) {
+                    succ = conn.startRecording();
+                }
+            }
+            catch (LwcommsException e) {
+                Log.e(TAG, e.getMessage());
+            }
+            catch (IOException e) {
+                Log.e(TAG, "error with cmd connection: %s", e.getMessage());
+            }
+
+            if (succ) {
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.RECORD,
+                        StatusMessage.SubType.STARTED));
+            }
+            else {
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.RECORD,
+                        StatusMessage.SubType.ERROR,
+                        R.string.error_start_record_failed));
+            }
+        }).start();
+    }
+
+    void stopRemoteRecord() {
+        new Thread(() -> {
+            boolean succ = false;
+
+            try (CamConnection conn = CamConnection.createAndConnect(mHost, mCmdPort)) {
+                succ = conn.stopRecording();
+            }
+            catch (LwcommsException e) {
+                Log.e(TAG, e.getMessage());
+            }
+            catch (IOException e) {
+                Log.e(TAG, "error with cmd connection: %s", e.getMessage());
+            }
+
+            if (succ) {
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.RECORD,
+                        StatusMessage.SubType.STOPPED));
+            }
+            else {
+                mHandler.sendMessage(new StatusMessage(
+                        StatusMessage.Type.RECORD,
+                        StatusMessage.SubType.ERROR,
+                        R.string.error_stop_record_failed));
             }
         }).start();
     }

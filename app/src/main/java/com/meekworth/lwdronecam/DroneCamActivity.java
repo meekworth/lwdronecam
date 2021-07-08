@@ -22,6 +22,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.meekworth.lwdronecam.utils.Log;
+
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -81,26 +83,26 @@ public class DroneCamActivity extends AppCompatActivity {
         }
     };
     private boolean mVisible;
-    private final Runnable mHideRunnable = new Runnable() {
-        @Override
-        public void run() {
-            hide();
-        }
-    };
+    private final Runnable mHideRunnable = this::hide;
+
     /**
      * Touch listener to use for in-layout UI controls to delay hiding the
      * system UI. This is to prevent the jarring behavior of controls going away
      * while interacting with activity UI.
      */
-    private final View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
-        @SuppressLint("ClickableViewAccessibility")
-        @Override
-        public boolean onTouch(View view, MotionEvent motionEvent) {
-            if (AUTO_HIDE) {
-                delayedHide(AUTO_HIDE_DELAY_MILLIS);
-            }
-            return false;
+    private final View.OnTouchListener mDelayHideTouchListener = (view, motionEvent) -> {
+        switch (motionEvent.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                if (AUTO_HIDE) {
+                    delayedHide(AUTO_HIDE_DELAY_MILLIS);
+                }
+                break;
+
+            case MotionEvent.ACTION_UP:
+                view.performClick();
+                break;
         }
+        return false;
     };
 
     private Button mStreamButton;
@@ -116,14 +118,17 @@ public class DroneCamActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_fullscreen);
 
-        StatusHandler handler = new StatusHandler(Looper.getMainLooper(), new Handler.Callback() {
-            @Override
-            public boolean handleMessage(@NonNull Message msg) {
-                return handleStatusMessage(msg);
-            }
-        });
-        Utils.setHandler(handler);
-        mDroneCam = new DroneCam(handler);
+        StatusHandler handler = StatusHandler.getInstance(
+                Looper.getMainLooper(),
+                this::handleStatusMessage);
+        mDroneCam = new DroneCam(
+                handler,
+                getSettingString(R.string.settings_key_cam_ip, R.string.default_cam_ip),
+                getSettingInt(
+                        R.string.settings_key_cam_stream_port,
+                        R.string.default_cam_stream_port),
+                getSettingInt(R.string.settings_key_cam_cmd_port, R.string.default_cam_cmd_port));
+
         mLastRecordNotify = new Date(); // init here so it's never null
 
         mVisible = true;
@@ -133,31 +138,16 @@ public class DroneCamActivity extends AppCompatActivity {
         mRecordButton = findViewById(R.id.record_button);
 
         // Set up the user interaction to manually show or hide the system UI.
-        mCamView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggle();
-            }
-        });
+        mCamView.setOnClickListener(view -> toggle());
         mCamView.setSurfaceTextureListener(new CameraViewListener(mDroneCam, mCamView));
 
         // Upon interacting with UI controls, delay any scheduled hide()
         // operations to prevent the jarring behavior of controls going away
         // while interacting with the UI.
         mStreamButton.setOnTouchListener(mDelayHideTouchListener);
-        mStreamButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                handleStreamClick((Button)v);
-            }
-        });
+        mStreamButton.setOnClickListener(v -> handleStreamClick((Button)v));
         mRecordButton.setOnTouchListener(mDelayHideTouchListener);
-        mRecordButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                handleRecordClick((Button)v);
-            }
-        });
+        mRecordButton.setOnClickListener(v -> handleRecordClick((Button)v));
     }
 
     @Override
@@ -187,7 +177,7 @@ public class DroneCamActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        Utils.logv(TAG, "on stop called");
+        Log.v(TAG, "on stop called");
         mDroneCam.stopStreaming();
         super.onStop();
     }
@@ -237,20 +227,16 @@ public class DroneCamActivity extends AppCompatActivity {
     }
 
     private void handleStreamClick(@NonNull Button b) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String currText = b.getText().toString();
+        setCurrentSettings();
 
         if (currText.equals(getString(R.string.start_stream))) {
             disableButton(b);
             try {
-                String host = getSettingString(
-                        R.string.settings_key_cam_ip, R.string.default_cam_ip);
-                int port = getSettingInt(
-                        R.string.settings_key_cam_stream_port, R.string.default_cam_stream_port);
-                mDroneCam.startStreaming(host, port);
+                mDroneCam.startStreaming();
             }
             catch (DroneCamException e) {
-                Utils.showMessage(e.getMessage());
+                StatusHandler.showMessage(e.getMessage());
             }
         }
         else if (currText.equals(getString(R.string.stop_stream))) {
@@ -264,12 +250,10 @@ public class DroneCamActivity extends AppCompatActivity {
 
     private void handleRecordClick(@NonNull Button b) {
         String currText = b.getText().toString();
-        String host = getSettingString(R.string.settings_key_cam_ip, R.string.default_cam_ip);
-        int port = getSettingInt(
-                R.string.settings_key_cam_ctrl_port, R.string.default_cam_ctrl_port);
+        setCurrentSettings();
 
         if (currText.equals(getString(R.string.start_record))) {
-            // Set current time here for checkResumeStreaming() to use in case streaming
+            // Get current time here for checkResumeStreaming() to use in case streaming
             // gets interrupted from this recording action.
             synchronized (mResumeStreaming) {
                 mLastRecordNotify = new Date();
@@ -277,12 +261,21 @@ public class DroneCamActivity extends AppCompatActivity {
             }
 
             disableButton(b);
-            mDroneCam.startRemoteRecord(host, port);
+            mDroneCam.startRemoteRecord();
         }
         else if (currText.equals(getString(R.string.stop_record))) {
-            mDroneCam.stopRemoteRecord(host, port);
+            mDroneCam.stopRemoteRecord();
             enableButton(b);
         }
+    }
+
+    private void setCurrentSettings() {
+        mDroneCam.setConnectionSettings(
+                getSettingString(R.string.settings_key_cam_ip, R.string.default_cam_ip),
+                getSettingInt(
+                        R.string.settings_key_cam_stream_port,
+                        R.string.default_cam_stream_port),
+                getSettingInt(R.string.settings_key_cam_cmd_port, R.string.default_cam_cmd_port));
     }
 
     private String getSettingString(int keyId, int defaultId) {
@@ -291,14 +284,13 @@ public class DroneCamActivity extends AppCompatActivity {
     }
 
     private int getSettingInt(int keyId, int defaultId) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String val = getSettingString(keyId, defaultId);
 
         try {
             return Integer.parseInt(val);
         }
         catch (NumberFormatException e) {
-            Utils.loge(TAG, "failed to parse int setting value: %s", val);
+            Log.e(TAG, "failed to parse int setting value: %s", val);
             return 0;
         }
     }
@@ -339,7 +331,7 @@ public class DroneCamActivity extends AppCompatActivity {
                     checkResumeStreaming();
                 }
                 else if (msg.getSubType() == StatusMessage.SubType.ERROR) {
-                    Utils.showMessage(msgStr);
+                    StatusHandler.showMessage(msgStr);
                     mStreamButton.setText(R.string.start_stream);
                     enableButton(mStreamButton);
                     checkResumeStreaming();
@@ -356,7 +348,7 @@ public class DroneCamActivity extends AppCompatActivity {
                     enableButton(mRecordButton);
                 }
                 else if (msg.getSubType() == StatusMessage.SubType.ERROR) {
-                    Utils.showMessage(msgStr);
+                    StatusHandler.showMessage(msgStr);
                     mRecordButton.setText(R.string.start_record);
                     enableButton(mRecordButton);
                 }

@@ -4,5 +4,5 @@
 
     <string name="default_cam_ip">192.168.0.1</string>
     <string name="default_cam_stream_port">7060</string>
-    <string name="default_cam_ctrl_port">8060</string>
+    <string name="default_cam_cmd_port">8060</string>
 </resources>

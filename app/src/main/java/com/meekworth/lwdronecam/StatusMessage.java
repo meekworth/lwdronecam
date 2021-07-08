@@ -24,7 +24,7 @@ class StatusMessage {
         RES_ID
     }
 
-    private Type mType;
+    private final Type mType;
     private SubType mSubType;
     private MessageType mMsgType;
     private String mMsgFmt;

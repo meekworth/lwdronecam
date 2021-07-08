@@ -12,6 +12,11 @@ The drone I have and tested with is the Force1 Blue Heron U49W Drone. The embedd
 
 Built with Android Studio.
 
+## Download
+
+If you don't want to build it yourself, this app is available on Google Play:
+
+https://play.google.com/store/apps/details?id=com.meekworth.lwdronecam
 
 ## License
 
